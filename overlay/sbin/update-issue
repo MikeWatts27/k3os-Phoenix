@@ -1,27 +1,47 @@
 #!/bin/bash
-
 . /etc/os-release
-cat > /etc/issue << "COW"
-               ,        ,
-  ,------------|'------'|  _     ____
- / .           '-'    |-' | |   |___ \\
- \\/|             |    |   | | __  __) |  ___   ___
-   |   .________.'----'   | |/ / |__ <  / _ \\ / __|
-   |   |        |   |     |   <  ___) || (_) |\\__ \\
-   \\___/        \\___/     |_|\\_\\|____/  \\___/ |___/
 
-COW
+cat > /etc/issue << "PHX"
+                         .''.
+                     .''      ``.
+                  .''              ``.
+              .''                      ``.
+           .''    _..----.._               ``.
+        .''    .-'          '-.               ``.
+      .'      /   /\      /\   \                 `.
+     /       |   (  )    (  )   |                  \
+    |        \    \/      \/    /                   |
+    |         '-.          .-'                      |
+     \            '--.__.--'                       /
+      `.                 _                        .'
+        `.             (_)                      .'
+          ``.                                   .'
+             ``.       P H O E N I X         .'
+                ``.                       .'
+                    ``.               .'
+                        ``.       .'
+                            ``.''
+
+
+PHX
 
 cat >> /etc/issue << EOF
+k3OS Phoenix — Reborn. Reinvented. Reloaded.
 $PRETTY_NAME
-Kernel \r on an \m (\l)
+Kernel \r on \m (\l)
 
 ================================================================================
-NIC              State          Address
-$(ip -br addr show | grep -E -v '^(lo|flannel|cni|veth)')
+ Hostname:     $(hostname)
+ Uptime:       $(uptime -p | sed 's/up //')
+ K3s Version:  $(k3s --version 2>/dev/null | head -n1)
+ Node Role:    $(grep -qi server /etc/systemd/system/k3s.service 2>/dev/null && echo "server" || echo "agent")
 ================================================================================
+ Network Interfaces
+$(ip -br addr show | grep -Ev '^(lo|cni|flannel|veth|docker)')
+================================================================================
+
 EOF
-cat >> /etc/issue << "EOF"
 
-Welcome to k3OS (login with user: rancher)
+cat >> /etc/issue << "EOF"
+ Welcome to k3OS Phoenix — login with user: rancher
 EOF
