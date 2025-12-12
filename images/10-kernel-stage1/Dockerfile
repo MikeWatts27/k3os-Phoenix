@@ -1,21 +1,9 @@
+# K3OS kernel build for Ubuntu Jammy
 ARG REPO
 ARG TAG
-FROM ubuntu:focal
+FROM ubuntu:jammy
 
-RUN apt-get --assume-yes update \
- && apt-get --assume-yes install \
-    curl \
-    initramfs-tools \
-    kmod \
-    lz4 \
-    rsync \
-    xz-utils \
- && echo 'r8152' >> /etc/initramfs-tools/modules \
- && echo 'hfs' >> /etc/initramfs-tools/modules \
- && echo 'hfsplus' >> /etc/initramfs-tools/modules \
- && echo 'nls_utf8' >> /etc/initramfs-tools/modules \
- && echo 'nls_iso8859_1' >> /etc/initramfs-tools/modules
-
+# Arguments
 ARG ARCH
 ENV KVERSION=5.4.0-88-generic
 ENV URL=https://github.com/rancher/k3os-kernel/releases/download/5.4.0-88.99-rancher1
@@ -23,37 +11,41 @@ ENV KERNEL_XZ=${URL}/kernel-generic_${ARCH}.tar.xz
 ENV KERNEL_EXTRA_XZ=${URL}/kernel-extra-generic_${ARCH}.tar.xz
 ENV KERNEL_HEADERS_XZ=${URL}/kernel-headers-generic_${ARCH}.tar.xz
 
-# Download kernel
-RUN mkdir -p /usr/src
-RUN curl -fL $KERNEL_XZ -o /usr/src/kernel.tar.xz
-RUN curl -fL $KERNEL_EXTRA_XZ -o /usr/src/kernel-extra.tar.xz
-RUN curl -fL $KERNEL_HEADERS_XZ -o /usr/src/kernel-headers.tar.xz
+# Install required packages and configure modules
+RUN apt-get update && \
+    apt-get install -y curl initramfs-tools kmod lz4 rsync xz-utils cpio gzip && \
+    echo -e "r8152\nhfs\nhfsplus\nnls_utf8\nnls_iso8859_1" >> /etc/initramfs-tools/modules && \
+    rm -rf /var/lib/apt/lists/*
 
-# Extract to /usr/src/root
+# Download kernel tarballs
+RUN mkdir -p /usr/src && \
+    curl -fL $KERNEL_XZ -o /usr/src/kernel.tar.xz && \
+    curl -fL $KERNEL_EXTRA_XZ -o /usr/src/kernel-extra.tar.xz && \
+    curl -fL $KERNEL_HEADERS_XZ -o /usr/src/kernel-headers.tar.xz
+
+# Extract kernel, headers, and extra modules
 RUN mkdir -p /usr/src/root && \
-    cd /usr/src/root && \
-    tar xvf /usr/src/kernel.tar.xz && \
-    tar xvf /usr/src/kernel-extra.tar.xz && \
-    tar xvf /usr/src/kernel-headers.tar.xz
+    tar -xf /usr/src/kernel.tar.xz -C /usr/src/root && \
+    tar -xf /usr/src/kernel-extra.tar.xz -C /usr/src/root && \
+    tar -xf /usr/src/kernel-headers.tar.xz -C /usr/src/root
 
-# Create initrd
-RUN mkdir /usr/src/initrd && \
-    rsync -a /usr/src/root/lib/ /lib/ && \
-    depmod $KVERSION && \
+# Create initrd targeting extracted kernel
+RUN mkdir -p /usr/src/initrd && \
+    rsync -a /usr/src/root/lib/ /usr/src/initrd/lib/ && \
+    depmod -b /usr/src/root $KVERSION && \
     mkinitramfs -k $KVERSION -c lz4 -o /usr/src/initrd.tmp
 
 # Generate initrd firmware and module lists
-RUN mkdir -p /output/lib && \
-    mkdir -p /output/headers && \
+RUN mkdir -p /output/lib /output/headers && \
     cd /usr/src/initrd && \
     lz4cat /usr/src/initrd.tmp | cpio -idmv && \
-    find lib/modules -name \*.ko > /output/initrd-modules && \
+    find lib/modules -name '*.ko' > /output/initrd-modules && \
     echo lib/modules/${KVERSION}/modules.order >> /output/initrd-modules && \
     echo lib/modules/${KVERSION}/modules.builtin >> /output/initrd-modules && \
     find lib/firmware -type f > /output/initrd-firmware && \
     find usr/lib/firmware -type f | sed 's!usr/!!' >> /output/initrd-firmware
 
-# Copy output assets
+# Copy final kernel artifacts
 RUN cd /usr/src/root && \
     cp -r usr/src/linux-headers* /output/headers && \
     cp -r lib/firmware /output/lib/firmware && \
